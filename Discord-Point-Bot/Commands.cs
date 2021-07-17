@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Security;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -57,22 +58,50 @@ namespace Discord_Point_Bot
             await Context.Channel.SendMessageAsync($"{Context.User.Mention} 출석 체크 되었습니다!");
         }
 
-        [Command("bet")]
-        public async Task Bet()
+        [Command("betlist")]
+        public async Task BetList()
         {
             Betting betting = Betting.Instance();
+            string description = "";
 
-            betting.NewEvent("new event A");
-            betting.NewEvent("new event C");
-            betting.NewEvent("new event B");
-            string a = "";
-            foreach (Event @event in betting.AllEvents())
+            List<Event> events = betting.AllEvents();
+            foreach (Event e in events)
             {
-                a += $"{@event.Title} {@event.Date}\n";
+                description += $"**{e.title}**\n\n";
+                description += $"{e.date}";
             }
+
             EmbedBuilder embed = new EmbedBuilder();
             embed.WithTitle(":exclamation: 베팅")
-                .WithDescription(a)
+                .WithDescription(description)
+                .WithColor(169, 211, 219)
+                .WithCurrentTimestamp();
+            await Context.Channel.SendMessageAsync(embed: embed.Build());
+
+        }
+
+        [Command("bet")]
+        public async Task Bet(string title, [Remainder]string events)
+        {
+            SQLite sqlite = SQLite.Instance();
+            Event e = Betting.Parse(title, Context.User.Id.ToString(), events);
+
+            if (e.forms.Count < 2)
+            {
+                await Context.Channel.SendMessageAsync($"{Context.User.Mention} 항목이 적어도 두 개 이상 필요합니다!");
+                return;
+            }
+            string description = "새 종목을 개설했습니다!\n\n```";
+            for (int i = 0; i < e.forms.Count; i++)
+            {
+                description += $"{(char)('A' + i)}. {e.forms[i].form}\n";
+            }
+            description += "```";
+            sqlite.BetTableInsert(e.title, e.ToJson());
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.WithAuthor(Context.User)
+                .WithTitle(e.title)
+                .WithDescription(description)
                 .WithColor(169, 211, 219)
                 .WithCurrentTimestamp();
             await Context.Channel.SendMessageAsync(embed: embed.Build());

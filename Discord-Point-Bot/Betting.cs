@@ -1,98 +1,93 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using System.Text;
 
 namespace Discord_Point_Bot
 {
-    public class UserBet
+    public class BetUser
     {
-        public SocketUser user;
+        public string user;
         public int point;
     }
 
     public class Form
     {
-        public string name;
-        public List<UserBet> member;
+        public string form;
+        public List<BetUser> users;
 
         public Form()
         {
-            member = new List<UserBet>();
-        }
-
-        public bool HasUser(SocketUser user)
-        {
-            if (member.Single(x => x.user.Id == user.Id) != null)
-                return true;
-            return false;
-        }
-
-        public void AddUser(SocketUser user, int point)
-        {
-            member.Add(new UserBet { user = user, point = point });
-        }
-
-        public void UpdateUser(SocketUser user, int point)
-        {
-            member.Single(x => x.user.Id == user.Id).point = point;
-        }
-
-        public void DeleteUser(SocketUser user)
-        {
-            member.Remove(member.Single(x => x.user.Id == user.Id));
+            users = new List<BetUser>();
         }
     }
 
     public class Event
     {
-        private string title;
-        private string date;
-        private List<Form> forms;
+        public string title;
+        public string author;
+        public string date;
+        public List<Form> forms;
 
         public Event()
         {
             forms = new List<Form>();
         }
 
-        public string Title
+        public string ToJson()
         {
-            get { return title; }
-            set { title = value; }
-        }
+            StringBuilder stringBuilder = new StringBuilder();
+            StringWriter stringWriter = new StringWriter(stringBuilder);
 
-        public string Date 
-        {
-            get { return date; }
-            set { date = value; }
-        }
+            using (JsonWriter writer = new JsonTextWriter(stringWriter))
+            {
+                writer.Formatting = Formatting.Indented;
 
-        public void AddForm(string name)
-        {
-            forms.Add(new Form { name = name });
+                writer.WriteStartObject();
+                writer.WritePropertyName("title");
+                writer.WriteValue(title);
+                writer.WritePropertyName("date");
+                writer.WriteValue(date);
+                writer.WritePropertyName("author");
+                writer.WriteValue(author);
+                writer.WritePropertyName("events");
+                writer.WriteStartArray();
+                foreach (Form e in forms)
+                {
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("form");
+                    writer.WriteValue(e.form);
+                    writer.WritePropertyName("users");
+                    writer.WriteStartArray();
+                    foreach (BetUser u in e.users)
+                    {
+                        writer.WriteStartObject();
+                        writer.WritePropertyName("user");
+                        writer.WriteValue(u.user);
+                        writer.WritePropertyName("point");
+                        writer.WriteValue(u.point);
+                        writer.WriteEndObject();
+                    }
+                    writer.WriteEnd();
+                    writer.WriteEndObject();
+                }
+                writer.WriteEnd();
+                writer.WriteEndObject();
+            }
+            return stringBuilder.ToString();
         }
-
-        public IEnumerable<Form> AllForms()
-        {
-            return forms.AsEnumerable();
-        }
-
-    
     }
 
     public class Betting
     {
         public static Betting instance = null;
 
-        private List<Event> events;
-
-        public Betting()
-        {
-            events = new List<Event>();
-        }
+        private SQLite sqlite;
 
         public static Betting Instance()
         {
@@ -101,17 +96,35 @@ namespace Discord_Point_Bot
             return instance;
         }
 
-        public void NewEvent(string title)
+        public static Event Parse(string title, string author, string events)
         {
-            Event @event = new Event();
-            @event.Title = title;
-            @event.Date = DateTime.Now.ToString("MMddyyyy");
-            events.Add(@event);
+            Event e = new Event();
+            string[] eventArr = events.Split(',');
+
+            e.title = title;
+            e.author = author;
+            e.date = DateTime.Now.ToString("MMddyyyy");
+            foreach (string form in eventArr)
+            {
+                if (form != "")
+                    e.forms.Add(new Form { form = form.Trim() });
+            }
+            return e;
         }
 
-        public IEnumerable<Event> AllEvents()
+        public Betting()
         {
-            return events.AsEnumerable();
+            sqlite = SQLite.Instance();
+        }
+
+        public void NewEvent(string title, string data)
+        {
+            sqlite.BetTableInsert(title, data);
+        }
+
+        public List<Event> AllEvents()
+        {
+            return (sqlite.GetBetList());
         }
     }
 }

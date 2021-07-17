@@ -3,6 +3,8 @@ using System.Data.SQLite;
 using System.Collections.Generic;
 using System.Text;
 using System.ComponentModel;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace Discord_Point_Bot
 {
@@ -19,10 +21,10 @@ namespace Discord_Point_Bot
             return instance;
         }
 
-        public static void free()
+        public static void Free()
         {
             if (instance != null)
-                instance.close();
+                instance.Close();
         }
 
         SQLite()
@@ -40,7 +42,7 @@ namespace Discord_Point_Bot
             }
         }
 
-        private void close()
+        private void Close()
         {
             connection.Close();
             Console.WriteLine("SQLite is disconnected");
@@ -54,14 +56,18 @@ namespace Discord_Point_Bot
                 );
             command.ExecuteNonQuery();
             command = new SQLiteCommand(
-                "CREATE TABLE IF NOT EXISTS Betting (user TEXT, donate TEXT, attendance TEXT, point INTEGER)"
+                "CREATE TABLE IF NOT EXISTS Bet (title TEXT, date TEXT, event TEXT)"
                 , connection
                 );
             command.ExecuteNonQuery();
 
         }
 
-        public void TableInsert(string id, string attendance, int point)
+        /*
+         * Manage SQL Table 'User'
+         * 
+         */
+        public void UserTableInsert(string id, string attendance, int point)
         {
             Console.WriteLine($"new row in User {id}");
             SQLiteCommand command = new SQLiteCommand(
@@ -98,7 +104,7 @@ namespace Discord_Point_Bot
             SQLiteDataReader reader = cmd.ExecuteReader();
             if (!reader.HasRows)
             {
-                TableInsert(id, "null", 0);
+                UserTableInsert(id, "null", 0);
                 result.Donate = "";
                 result.Attendance = "null";
                 result.Point = 0;
@@ -112,6 +118,43 @@ namespace Discord_Point_Bot
             }
             reader.Close();
             return result;
+        }
+
+        /*
+         * Manage SQL Table Bet
+         * 
+         */
+        public void BetTableInsert(string title, string data)
+        {
+            Console.WriteLine($"new row in Bet {title}");
+            SQLiteCommand command = new SQLiteCommand(
+                $"INSERT INTO Bet (title, date, event) values ('{title}', '{DateTime.Now:MMddyyyy}', '{data}')",
+                connection
+                );
+            command.ExecuteNonQuery();
+        }
+
+        public List<Event> GetBetList()
+        {
+            List<Event> events = new List<Event>();
+            Event block;
+
+            SQLiteCommand cmd = new SQLiteCommand(
+                $"SELECT * FROM Bet",
+                connection
+                );
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                block = new Event();
+                block.title = reader["title"].ToString();
+                block.date = reader["date"].ToString();
+                foreach (JToken token in JObject.Parse(reader["event"].ToString())["events"].Children())
+                    ;//block.users.Add(token.ToObject<BetUser>());
+                events.Add(block);
+            }
+            reader.Close();
+            return events;
         }
     }
 }

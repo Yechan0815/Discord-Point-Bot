@@ -62,7 +62,7 @@ namespace Discord_Point_Bot
         private async void Interrupt(object sender, ConsoleCancelEventArgs args)
         {
             Console.WriteLine("Interrupt");
-            SQLite.free();
+            SQLite.Free();
             await _client.StopAsync();
             Environment.Exit(0);
         }
