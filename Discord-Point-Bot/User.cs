@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Discord.WebSocket;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Discord_Point_Bot
@@ -26,6 +28,16 @@ namespace Discord_Point_Bot
         {
             get { return point;  }
             set { point = value; }
+        }
+
+        public static SocketUser FindUserAsId(IReadOnlyCollection<SocketGuildUser> users, string id)
+        {
+            foreach (var u in users.AsEnumerable())
+            {
+                if (u.Id.ToString() == id)
+                    return u;
+            }
+            return null;
         }
     }
 }

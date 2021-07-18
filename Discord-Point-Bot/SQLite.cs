@@ -128,7 +128,7 @@ namespace Discord_Point_Bot
         {
             Console.WriteLine($"new row in Bet {title}");
             SQLiteCommand command = new SQLiteCommand(
-                $"INSERT INTO Bet (title, date, event) values ('{title}', '{DateTime.Now:MMddyyyy}', '{data}')",
+                $"INSERT INTO Bet (title, date, event) values ('{title}', '{DateTime.Now:MMddyyyyHHmmss}', '{data}')",
                 connection
                 );
             command.ExecuteNonQuery();
@@ -138,6 +138,8 @@ namespace Discord_Point_Bot
         {
             List<Event> events = new List<Event>();
             Event block;
+            JObject json;
+            Form form;
 
             SQLiteCommand cmd = new SQLiteCommand(
                 $"SELECT * FROM Bet",
@@ -147,14 +149,41 @@ namespace Discord_Point_Bot
             while (reader.Read())
             {
                 block = new Event();
-                block.title = reader["title"].ToString();
-                block.date = reader["date"].ToString();
-                foreach (JToken token in JObject.Parse(reader["event"].ToString())["events"].Children())
-                    ;//block.users.Add(token.ToObject<BetUser>());
+                json = JObject.Parse(reader["event"].ToString());
+                block.title = json["title"].ToString();
+                block.author = json["author"].ToString();
+                block.date = json["date"].ToString();
+                foreach (JToken token in json["events"].Children())
+                {
+                    form = new Form();
+                    form.form = token["form"].ToString();
+                    block.forms.Add(form);
+                    foreach (JToken u in token["users"].Children())
+                        form.users.Add(u.ToObject<BetUser>());
+                }
                 events.Add(block);
             }
             reader.Close();
             return events;
         }
+
+        public void BetUpdate(string date, string data)
+        {
+            SQLiteCommand command = new SQLiteCommand(
+                $"UPDATE Bet SET event='{data}' WHERE date='{date}'",
+                connection
+                );
+            command.ExecuteNonQuery();
+        }
+
+        public void BetDelete(string date)
+        {
+            SQLiteCommand command = new SQLiteCommand(
+                $"DELETE From Bet WHERE date='{date}'",
+                connection
+                );
+            command.ExecuteNonQuery();
+        }
+
     }
 }
