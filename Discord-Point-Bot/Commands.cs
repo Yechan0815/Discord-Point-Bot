@@ -74,7 +74,6 @@ namespace Discord_Point_Bot
                 embed.AddField(
                     $"`{(char)('A' + i)}.` __{events[i].title}__ ({(author == null ? "알 수 없음" : author.Username)})",
                     $"총 {count}명이 참여 중입니다!\n᲼"
-
                     );
             }
             embed.WithTitle(":exclamation: 베팅")
@@ -221,12 +220,77 @@ namespace Discord_Point_Bot
             await Context.Channel.SendMessageAsync(embed: embed.Build());
         }
 
-        [Command("donation")]
-        public async Task donationList(SocketUser user, int point)
+        [Command("store")]
+        public async Task storeList()
         {
-            
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.WithTitle(":moneybag: Store")
+                .WithDescription("아래 명령어를 포인트로 사용할 수 있습니다")
+                .WithColor(169, 211, 219)
+                .AddField(
+                "멘션한 유저에게 태그를 달 수 있습니다",
+                "1000 Point\n`y tag [@Mention] [tag name]`\n᲼"
+                )
+                .AddField(
+                "멘션한 유저에게서 태그를 뗄 수 있습니다",
+                "1100 Point\n`y untag [@Mention] [tag name]`\n᲼"
+                );
+
+
+            await Context.Channel.SendMessageAsync(embed: embed.Build());
         }
 
+        [Command("tag")]
+        public async Task GiveTag(SocketUser user, [Remainder]string name)
+        {
+            SQLite sqlite = SQLite.Instance();
+            IRole role;
+            User u = sqlite.GetUser(Context.User.Id.ToString());
+
+            if (u.Point < 1000)
+            {
+                await Context.Channel.SendMessageAsync($"{Context.User.Mention} 포인트가 부족합니다!");
+                return;
+            }
+            if ((role = Context.Guild.Roles.FirstOrDefault(x => x.Name.ToString() == name)) == null)
+                role = await Context.Guild.CreateRoleAsync(name, null, new Color(100, 100, 100), false, false, null);
+            await (user as IGuildUser).AddRoleAsync(role);
+            sqlite.UserUpdate(Context.User.Id.ToString(), point: u.Point - 1000);
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.WithTitle(":white_check_mark: Tag")
+                .WithDescription($"{user.Mention} {name} 태그를 달았습니다!\n\n```{Context.User.Username} -1000 Point```")
+                .WithColor(169, 211, 219)
+                .WithCurrentTimestamp();
+            await Context.Channel.SendMessageAsync(embed: embed.Build());
+        }
+
+        [Command("untag")]
+        public async Task TakeTag(SocketUser user, [Remainder]string name)
+        {
+            SQLite sqlite = SQLite.Instance();
+            User u = sqlite.GetUser(Context.User.Id.ToString());
+            IRole role = Context.Guild.Roles.FirstOrDefault(x => x.Name.ToString() == name);
+
+            if (u.Point < 1100)
+            {
+                await Context.Channel.SendMessageAsync($"{Context.User.Mention} 포인트가 부족합니다!");
+                return;
+            }
+            if (role == null)
+            {
+                await Context.Channel.SendMessageAsync($"{Context.User.Mention} 해당 태그가 존재하는 지 다시 확인해주세요!");
+                return;
+            }
+            await (user as IGuildUser).RemoveRoleAsync(role);
+            sqlite.UserUpdate(Context.User.Id.ToString(), point: u.Point - 1100);
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.WithTitle(":white_check_mark: Untag")
+                .WithDescription($"{user.Mention} {name} 태그를 제거 했습니다!\n\n```{Context.User.Username} -1100 Point```")
+                .WithColor(169, 211, 219)
+                .WithCurrentTimestamp();
+            await Context.Channel.SendMessageAsync(embed: embed.Build());
+        }
+ 
         [Command("point")]
         public async Task _point_add(SocketUser user, int point)
         {
